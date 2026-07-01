@@ -257,14 +257,22 @@ body {
       </div>
       <div class="section-body">
         <div class="hint-row">選擇保單整理圖後，系統會在瀏覽器本機自動辨識並填入下方欄位；辨識結果請務必人工核對後再手動修正，確認無誤再按最下方「生成保障卡片」。</div>
+        <label class="lifetime-label" style="margin-top:2px;">
+          <input type="checkbox" id="ocrAutoCrop" checked> 圖片為「圓餅圖＋兩欄數值表」版面時，自動裁去圖表並分欄辨識（建議保持勾選，可大幅提升準確率）
+        </label>
         <input type="file" id="ocrFileInput" accept="image/*" style="display:none" onchange="handleOcrImageSelect(event)">
         <button type="button" class="generate-btn" id="ocrImportBtn" onclick="document.getElementById('ocrFileInput').click()">
           <i class="ti ti-photo-scan"></i> 選擇保單圖片並自動辨識
         </button>
         <div class="ocr-status" id="ocrStatus" style="display:none;"></div>
+        <div id="ocrDebugToggle" style="display:none;">
+          <a href="javascript:void(0)" onclick="toggleOcrDebug()" style="font-size:11px;color:var(--text-muted);">顯示／隱藏辨識原始文字（除錯用）</a>
+          <pre class="ocr-status" id="ocrRawText" style="display:none;max-height:220px;overflow:auto;font-size:11px;"></pre>
+        </div>
       </div>
     </div>
     <!-- ===== 新增 OCR 功能結束 ===== -->
+
 
     <div class="section-card">
       <div class="section-header">
