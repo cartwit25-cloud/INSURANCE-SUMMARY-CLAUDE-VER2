@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>保障建議書轉換</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.4.0/dist/tabler-icons.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<!-- ===== 新增 OCR 功能開始：Tesseract.js（免費、免 API Key、瀏覽器端 OCR） ===== -->
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<!-- ===== 新增 OCR 功能結束 ===== -->
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #f7f6f2;
+  --surface: #ffffff;
+  --surface-1: #f9f8f5;
+  --border: rgba(0,0,0,0.07);
+  --border-strong: rgba(0,0,0,0.13);
+  --text-primary: #2a2a27;
+  --text-secondary: #6b6a65;
+  --text-muted: #a8a79f;
+  --radius: 10px;
+  --accent: #5b8a78;
+}
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  background: var(--bg); color: var(--text-primary);
+  min-height: 100vh; padding: 2rem 1rem 4rem;
+}
+.container { max-width: 820px; margin: 0 auto; }
+.page-title { font-size: 19px; font-weight: 600; margin-bottom: 3px; letter-spacing: -0.3px; }
+.page-sub { font-size: 13px; color: var(--text-muted); margin-bottom: 1.5rem; }
+
+.tabs {
+  display: flex; margin-bottom: 1.5rem;
+  border-radius: 12px; overflow: hidden;
+  border: 0.5px solid var(--border-strong); background: var(--surface);
+}
+.tab-btn {
+  flex: 1; padding: 0.6rem 0.5rem;
+  border: none; background: transparent;
+  font-size: 13px; font-weight: 500; color: var(--text-muted);
+  cursor: pointer; transition: all 0.15s;
+  border-right: 0.5px solid var(--border);
+}
+.tab-btn:last-child { border-right: none; }
+.tab-btn.active { background: var(--accent); color: #fff; }
+.tab-btn:hover:not(.active) { background: var(--surface-1); color: var(--text-primary); }
+
+.form-view, .result-view { display: none; }
+.form-view.active, .result-view.active { display: block; }
+
+.section-card {
+  background: var(--surface); border-radius: 14px;
+  border: 0.5px solid var(--border); padding: 1.2rem 1.4rem;
+  margin-bottom: 0.85rem;
+}
+.section-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 1rem;
+}
+.section-title-row { display: flex; align-items: center; gap: 8px; }
+.section-icon { font-size: 17px; line-height: 1; }
+.section-name { font-size: 14px; font-weight: 600; }
+
+.toggle-switch { position: relative; width: 38px; height: 21px; flex-shrink: 0; }
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-slider {
+  position: absolute; inset: 0; background: #ddd;
+  border-radius: 21px; cursor: pointer; transition: 0.2s;
+}
+.toggle-slider::before {
+  content: ''; position: absolute;
+  width: 15px; height: 15px; left: 3px; bottom: 3px;
+  background: white; border-radius: 50%; transition: 0.2s;
+}
+.toggle-switch input:checked + .toggle-slider { background: var(--accent); }
+.toggle-switch input:checked + .toggle-slider::before { transform: translateX(17px); }
+
+.section-body { display: grid; gap: 10px; }
+.section-body.disabled { opacity: 0.32; pointer-events: none; }
+
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.field-row.triple { grid-template-columns: 1fr 1fr 1fr; }
+.field-row.single { grid-template-columns: 1fr; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field label { font-size: 11px; color: var(--text-muted); font-weight: 500; }
+.field input, .field textarea {
+  padding: 0.48rem 0.65rem;
+  border: 0.5px solid var(--border-strong);
+  border-radius: var(--radius);
+  font-size: 13.5px; color: var(--text-primary);
+  background: var(--surface-1); transition: border-color 0.15s;
+  font-family: inherit;
+}
+.field input:focus, .field textarea:focus {
+  outline: none; border-color: var(--accent); background: var(--surface);
+}
+.field textarea { resize: vertical; min-height: 70px; line-height: 1.5; }
+
+.period-wrap { position: relative; display: flex; align-items: center; }
+.period-wrap input {
+  width: 100%; padding: 0.48rem 2.2rem 0.48rem 0.65rem;
+  border: 0.5px solid var(--border-strong); border-radius: var(--radius);
+  font-size: 13.5px; color: var(--text-primary);
+  background: var(--surface-1); transition: border-color 0.15s;
+}
+.period-wrap input:focus { outline: none; border-color: var(--accent); background: var(--surface); }
+.period-wrap input:disabled { opacity: 0.4; }
+.period-suffix { position: absolute; right: 0.6rem; font-size: 12px; color: var(--text-muted); pointer-events: none; }
+.lifetime-label {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 11px; color: var(--text-muted); cursor: pointer; margin-top: 3px;
+}
+.lifetime-label input { accent-color: var(--accent); cursor: pointer; width: 13px; height: 13px; }
+
+.hint-row { font-size: 11px; color: var(--text-muted); background: var(--surface-1); border-radius: 7px; padding: 6px 10px; }
+.sum-preview { font-size: 12px; color: var(--accent); font-weight: 600; padding: 5px 10px; background: #eaf3ef; border-radius: 7px; }
+
+.generate-btn {
+  width: 100%; padding: 0.78rem;
+  background: var(--accent); color: #fff;
+  border: none; border-radius: 12px;
+  font-size: 14.5px; font-weight: 600; cursor: pointer;
+  margin-top: 0.5rem; transition: opacity 0.15s;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.generate-btn:hover { opacity: 0.88; }
+
+/* ---- RESULT ---- */
+.result-layout {
+  display: grid; grid-template-columns: 320px 1fr;
+  gap: 1.25rem; align-items: start; margin-bottom: 1.25rem;
+}
+.pie-wrap {
+  background: var(--surface); border-radius: 16px;
+  border: 0.5px solid var(--border); padding: 1.25rem 1rem;
+  display: flex; flex-direction: column; align-items: center; gap: 0.85rem;
+}
+.pie-client { font-size: 15px; font-weight: 700; color: var(--text-primary); text-align: center; letter-spacing: -0.2px; }
+.pie-date { font-size: 11px; color: var(--text-muted); text-align: center; margin-top: -4px; }
+.pie-legend { width: 100%; display: flex; flex-direction: column; gap: 6px; }
+.leg-row { display: flex; align-items: center; gap: 8px; }
+.leg-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.leg-name { font-size: 11.5px; font-weight: 600; flex: 1; }
+.leg-pill { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 20px; white-space: nowrap; }
+.leg-on  { background: #eaf3ef; color: #3d7a63; }
+.leg-off { background: #f0efeb; color: #b0afa8; font-style: italic; }
+
+.cards-col { display: flex; flex-direction: column; gap: 9px; }
+.ins-card {
+  background: var(--surface); border-radius: 12px;
+  border: 0.5px solid var(--border); padding: 0.85rem 1.1rem;
+  border-left-width: 3px;
+}
+.tc-critical { border-left-color: #8ab8d8; }
+.tc-medical  { border-left-color: #8ac8a0; }
+.tc-longcare { border-left-color: #e8a878; }
+.tc-life     { border-left-color: #d88898; }
+.tc-finance  { border-left-color: #a898d0; }
+.tc-retire   { border-left-color: #c8c080; }
+
+.card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; }
+.card-title { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
+.card-title .emoji { font-size: 15px; line-height: 1; }
+.card-badge { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 20px; }
+.bc-critical { background: #ddeaf5; color: #3a6e96; }
+.bc-medical  { background: #dff0e3; color: #2e7a4a; }
+.bc-longcare { background: #fde8d5; color: #a05a28; }
+.bc-life     { background: #fde0e3; color: #a04050; }
+.bc-finance  { background: #eae4f7; color: #5a4490; }
+.bc-retire   { background: #f7f0d0; color: #806a10; }
+
+.card-rows { display: flex; flex-direction: column; gap: 3px; }
+.card-row {
+  display: flex; justify-content: space-between;
+  font-size: 12px; padding: 2.5px 0;
+  border-bottom: 0.5px solid rgba(0,0,0,0.05);
+}
+.card-row:last-child { border-bottom: none; }
+.card-row-label { color: var(--text-secondary); }
+.card-row-value { font-weight: 600; color: var(--text-primary); }
+.card-freetext { font-size: 12px; color: var(--text-secondary); line-height: 1.55; white-space: pre-wrap; }
+
+.summary-section {
+  background: var(--surface); border-radius: 14px;
+  border: 0.5px solid var(--border); padding: 1.2rem 1.4rem;
+}
+.sec-label { font-size: 10px; font-weight: 600; color: var(--text-muted); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 0.75rem; }
+.summary-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 9px; }
+.sum-card { background: var(--surface-1); border-radius: 10px; padding: 0.7rem; text-align: center; }
+.sum-lbl { font-size: 10px; color: var(--text-muted); margin-bottom: 3px; }
+.sum-val { font-size: 19px; font-weight: 700; }
+.sc-dark { color: var(--text-primary); }
+.sc-blue { color: #4a7fb5; }
+.sc-pink { color: #b84f68; }
+
+.action-row { display: flex; gap: 10px; margin-top: 1rem; }
+.btn-sec {
+  flex: 1; padding: 0.62rem; border-radius: 10px;
+  border: 0.5px solid var(--border-strong);
+  background: var(--surface); font-size: 13.5px; font-weight: 600;
+  cursor: pointer; color: var(--text-primary);
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  transition: background 0.15s;
+}
+.btn-sec:hover { background: var(--surface-1); }
+.btn-pri {
+  flex: 1; padding: 0.62rem; border-radius: 10px;
+  border: none; background: var(--accent);
+  font-size: 13.5px; font-weight: 600; color: #fff;
+  cursor: pointer; transition: opacity 0.15s;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.btn-pri:hover { opacity: 0.88; }
+
+@media (max-width: 580px) {
+  .result-layout { grid-template-columns: 1fr; }
+  .field-row { grid-template-columns: 1fr; }
+  .field-row.triple { grid-template-columns: 1fr 1fr; }
+  .summary-grid { grid-template-columns: repeat(3,1fr); }
+  .sum-val { font-size: 16px; }
+}
+
+/* ===== 新增 OCR 功能開始：圖片匯入狀態訊息樣式 ===== */
+.ocr-status {
+  margin-top: 10px; font-size: 12.5px; line-height: 1.6;
+  padding: 8px 10px; border-radius: 8px;
+  background: var(--surface-1); color: var(--text-secondary);
+  white-space: pre-wrap;
+}
+.ocr-status.ocr-loading { color: var(--accent); }
+.ocr-status.ocr-success { background: #eaf3ef; color: #3d7a63; }
+.ocr-status.ocr-error   { background: #fbe9e9; color: #b23b3b; }
+/* ===== 新增 OCR 功能結束 ===== */
+</style>
+</head>
+<body>
+<div class="container">
+  <h1 class="page-title">保障建議書轉換</h1>
+  <p class="page-sub">填入保障數字，自動生成清晰的保障卡片與圓餅圖</p>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('form')"><i class="ti ti-edit"></i> 填寫資料</button>
+    <button class="tab-btn" onclick="switchTab('result')"><i class="ti ti-layout-cards"></i> 保障卡片</button>
+  </div>
+
+  <!-- ===== FORM ===== -->
+  <div class="form-view active" id="formView">
+
+    <!-- ===== 新增 OCR 功能開始：圖片匯入區塊 ===== -->
+    <div class="section-card" id="ocrImportCard">
+      <div class="section-header">
+        <div class="section-title-row"><span class="section-icon">📷</span><span class="section-name">匯入保單圖片（OCR 自動辨識）</span></div>
+      </div>
+      <div class="section-body">
+        <div class="hint-row">選擇保單整理圖後，系統會在瀏覽器本機自動辨識並填入下方欄位；辨識結果請務必人工核對後再手動修正，確認無誤再按最下方「生成保障卡片」。</div>
+        <input type="file" id="ocrFileInput" accept="image/*" style="display:none" onchange="handleOcrImageSelect(event)">
+        <button type="button" class="generate-btn" id="ocrImportBtn" onclick="document.getElementById('ocrFileInput').click()">
+          <i class="ti ti-photo-scan"></i> 選擇保單圖片並自動辨識
+        </button>
+        <div class="ocr-status" id="ocrStatus" style="display:none;"></div>
+      </div>
+    </div>
+    <!-- ===== 新增 OCR 功能結束 ===== -->
+
+    <div class="section-card">
+      <div class="section-header">
+        <div class="section-title-row"><span class="section-icon">👤</span><span class="section-name">客戶資訊</span></div>
+      </div>
+      <div class="section-body">
+        <div class="field-row">
+          <div class="field"><label>客戶姓名</label><input type="text" id="clientName" placeholder="樊保瑜" /></div>
+          <div class="field"><label>建議書日期</label><input type="text" id="planDate" placeholder="115/06/28" /></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 重大傷病 -->
+    <div class="section-card">
+      <div class="section-header">
+        <div class="section-title-row"><span class="section-icon">🏥</span><span class="section-name">重大傷病 / 重大疾病</span></div>
+        <label class="toggle-switch"><input type="checkbox" id="tog-critical" checked onchange="toggleSection('critical')"><span class="toggle-slider"></span></label>
+      </div>
+      <div class="section-body" id="body-critical">
+        <div class="field-row">
+          <div class="field"><label>重大傷病 保額（萬）</label><input type="text" id="critical-amount" placeholder="120" /></div>
+          <div class="field">
+            <label>效期（歲）</label>
+            <div class="period-wrap"><input type="number" id="critical-age" placeholder="75" min="0" max="120" /><span class="period-suffix">歲</span></div>
+            <label class="lifetime-label"><input type="checkbox" id="critical-lifetime" onchange="toggleLifetime('critical')"> 終身</label>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>重大疾病 保額（萬）</label><input type="text" id="disease-amount" placeholder="50" /></div>
+          <div class="field">
+            <label>效期（歲）</label>
+            <div class="period-wrap"><input type="number" id="disease-age" placeholder="75" min="0" max="120" /><span class="period-suffix">歲</span></div>
+            <label class="lifetime-label"><input type="checkbox" id="disease-lifetime" onchange="toggleLifetime('disease')"> 終身</label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 日額/手術 -->
+    <div class="section-card">
+      <div class="section-header">
+        <div class="section-title-row"><span class="section-icon">💊</span><span class="section-name">日額 / 手術</span></div>
+        <label class="toggle-switch"><input type="checkbox" id="tog-daily" checked onchange="toggleSection('daily')"><span class="toggle-slider"></span></label>
+      </div>
+      <div class="section-body" id="body-daily">
+        <div class="hint-row">以百元為單位輸入，住院日額 = 住院日額 + 住院看護 + 出院療養，系統自動加總</div>
+        <div class="field-row triple">
+          <div class="field"><label>住院日額（百元）</label><input type="number" id="daily-hosp" placeholder="10" oninput="updateDailySum()" /></div>
+          <div class="field"><label>住院看護（百元）</label><input type="number" id="daily-nurse" placeholder="5" oninput="updateDailySum()" /></div>
+          <div class="field"><label>出院療養（百元）</label><input type="number" id="daily-post" placeholder="5" oninput="updateDailySum()" /></div>
+        </div>
+        <div class="sum-preview" id="daily-sum-preview">住院日額合計：0 /日</div>
+        <div class="field-row">
+          <div class="field"><label>定額手術（最低）</label><input type="text" id="daily-op-min" placeholder="2,200" /></div>
+          <div class="field"><label>定額手術（最高）</label><input type="text" id="daily-op-max" placeholder="240,000" /></div>
+        </div>
+        <div class="field-row single">
+          <div class="field">
+            <label>效期（歲）</label>
+            <div class="period-wrap"><input type="number" id="daily-age" placeholder="85" min="0" max="120" /><span class="period-suffix">歲</span></div>
+            <label class="lifetime-label"><input type="checkbox" id="daily-lifetime" onchange="toggleLifetime('daily')"> 終身</label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 實支實付 -->
+    <div class="section-card">
+      <div class="section-header">
+        <div class="section-title-row"><span class="section-icon">🧾</span><span class="section-name">實支實付</span></div>
+        <label class="toggle-switch"><input type="checkbox" id="tog-reimbursement" checked onchange="toggleSection('reimbursement')"><span class="toggle-slider"></span></label>
+      </div>
+      <div class="section-body" id="body-reimbursement">
+        <div class="field-row">
+          <div class="field"><label>病房費（/日）</label><input type="text" id="reimb-room" placeholder="3,000" /></div>
+          <div class="field"><label>雜費限額</label><input type="text" id="reimb-misc" placeholder="300,000" /></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>手術（最低）</label><input type="text" id="reimb-op-min" placeholder="3,200" /></div>
+          <div class="field"><label>手術（最高）</label><input type="text" id="reimb-op-max" placeholder="400,000" /></div>
+        </div>
+        <div class="field-row single">
+          <div class="field">
+            <label>效期（歲）</label>
+            <div class="period-wrap"><input type="number" id="reimb-age" placeholder="80" min="0" max="120" /><span class="period-suffix">歲</span></div>
+            <label class="lifetime-label"><input type="checkbox" id="reimb-lifetime" onchange="toggleLifetime('reimb')"> 終身</label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 意外險 -->
+    <div class="section-card">
+      <div class="section-header">
+        <div class="section-title-row"><span class="section-icon">🚑</span><span class="section-name">意外險</span></div>
+        <label class="toggle-switch"><input type="checkbox" id="tog-accident" checked onchange="toggleSection('accident')"><span class="toggle-slider"></span></label>
+      </div>
+      <div class="section-body" id="body-accident">
+        <div class="field-row">
+          <div class="field"><label>身故 / 失能（萬）</label><input type="text" id="acc-death" placeholder="200" /></div>
+          <div class="field"><label>意外實支實付（萬）</label><input type="text" id="acc-reimb" placeholder="20" /></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>住院日額（百元）</label><input type="number" id="acc-daily" placeholder="20" /></div>
+          <div class="field"><label>骨折（範圍）</label><input type="text" id="acc-fracture" placeholder="15,000～400,000" /></div>
+        </div>
+        <div class="field-row single">
+          <div class="field">
+            <label>效期（歲）</label>
+            <div class="period-wrap"><input type="number" id="acc-age" placeholder="75" min="0" max="120" /><span class="period-suffix">歲</span></div>
+            <label class="lifetime-label"><input type="checkbox" id="acc-lifetime" onchange="toggleLifetime('acc')"> 終身</label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 癌症險 -->
+    <div class="section-card">
+      <div class="section-header">
+        <div class="section-title-row"><span class="section-icon">🎗️</span><span class="section-name">癌症險</span></div>
+        <label class="toggle-switch"><input type="checkbox" id="tog-cancer" checked onchange="toggleSection('cancer')"><span class="toggle-slider"></span></label>
+      </div>
+      <div class="section-body" id="body-cancer">
+        <div class="hint-row">以百元為單位輸入，癌症住院日額 = 癌症住院 + 出院療養，系統自動加總</div>
+        <div class="field-row">
+          <div class="field"><label>癌症住院（百元）</label><input type="number" id="cancer-hosp" placeholder="36" oninput="updateCancerSum()" /></div>
+          <div class="field"><label>出院療養（百元）</label><input type="number" id="cancer-post" placeholder="18" oninput="updateCancerSum()" /></div>
+        </div>
+        <div class="sum-preview" id="cancer-sum-preview">癌症住院日額合計：0 /日</div>
+        <div class="field-row">
+          <div class="field"><label>放射 / 化療（百元/次）</label><input type="text" id="cancer-chemo" placeholder="30" /></div>
+          <div class="field"><label>手術—重度（萬/次）</label><input type="text" id="cancer-op" placeholder="4.5" /></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>生存照顧金（萬/年）</label><input type="text" id="cancer-care-amt" placeholder="6" /></div>
+          <div class="field"><label>給付年數</label><input type="text" id="cancer-care-yrs" placeholder="8年" /></div>
+        </div>
+        <div class="field-row single">
+          <div class="field">
+            <label>效期（歲）</label>
+            <div class="period-wrap"><input type="number" id="cancer-age" placeholder="95" min="0" max="120" /><span class="period-suffix">歲</span></div>
+            <label class="lifetime-label"><input type="checkbox" id="cancer-lifetime" onchange="toggleLifetime('cancer')"> 終身</label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 長照 -->
+    <div class="section-card">
+      <div class="section-header">
+        <div class="section-title-row"><span class="section-icon">🤲</span><span class="section-name">長照</span></div>
+        <label class="toggle-switch"><input type="checkbox" id="tog-longcare" onchange="toggleSection('longcare')"><span class="toggle-slider"></span></label>
+      </div>
+      <div class="section-body disabled" id="body-longcare">
+        <div class="field-row">
+          <div class="field"><label>一次金（萬）</label><input type="text" id="longcare-lump" placeholder="120" /></div>
+          <div class="field"><label>每月照顧金（萬）</label><input type="text" id="longcare-monthly" placeholder="3" /></div>
+        </div>
+        <div class="field-row single">
+          <div class="field">
+            <label>效期（歲）</label>
+            <div class="period-wrap"><input type="number" id="longcare-age" placeholder="90" min="0" max="120" /><span class="period-suffix">歲</span></div>
+            <label class="lifetime-label"><input type="checkbox" id="longcare-lifetime" onchange="toggleLifetime('longcare')"> 終身</label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 壽險 -->
+    <div class="section-card">
+      <div class="section-header">
+        <div class="section-title-row"><span class="section-icon">❤️</span><span class="section-name">壽險</span></div>
+        <label class="toggle-switch"><input type="checkbox" id="tog-life" checked onchange="toggleSection('life')"><span class="toggle-slider"></span></label>
+      </div>
+      <div class="section-body" id="body-life">
+        <div class="field-row">
+          <div class="field"><label>保額（萬）</label><input type="text" id="life-amount" placeholder="120" /></div>
+          <div class="field">
+            <label>效期（歲）</label>
+            <div class="period-wrap"><input type="number" id="life-age" placeholder="" min="0" max="120" disabled /><span class="period-suffix">歲</span></div>
+            <label class="lifetime-label"><input type="checkbox" id="life-lifetime" onchange="toggleLifetime('life')" checked> 終身</label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 理財 -->
+    <div class="section-card">
+      <div class="section-header">
+        <div class="section-title-row"><span class="section-icon">💰</span><span class="section-name">理財</span></div>
+        <label class="toggle-switch"><input type="checkbox" id="tog-finance" onchange="toggleSection('finance')"><span class="toggle-slider"></span></label>
+      </div>
+      <div class="section-body disabled" id="body-finance">
+        <div class="field-row single">
+          <div class="field"><label>內容說明</label><textarea id="finance-note" placeholder="例：增額終身壽險，保費 XX 萬，20 年繳…"></textarea></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 退休 -->
+    <div class="section-card">
+      <div class="section-header">
+        <div class="section-title-row"><span class="section-icon">🌅</span><span class="section-name">退休</span></div>
+        <label class="toggle-switch"><input type="checkbox" id="tog-retire" onchange="toggleSection('retire')"><span class="toggle-slider"></span></label>
+      </div>
+      <div class="section-body disabled" id="body-retire">
+        <div class="field-row single">
+          <div class="field"><label>內容說明</label><textarea id="retire-note" placeholder="例：年金險，65 歲起每月領 XX,XXX 元…"></textarea></div>
+        </div>
+      </div>
+    </div>
+
+    <button class="generate-btn" onclick="generate()">
+      <i class="ti ti-layout-cards"></i> 生成保障卡片
+    </button>
+  </div>
+
+  <!-- ===== RESULT ===== -->
+  <div class="result-view" id="resultView">
+    <div class="result-layout">
+      <div class="pie-wrap">
+        <div class="pie-client" id="pieClientName"></div>
+        <div class="pie-date" id="piePlanDate"></div>
+        <canvas id="pieChart" style="display:block;"></canvas>
+        <div class="pie-legend" id="pieLegend"></div>
+      </div>
+      <div class="cards-col" id="cardsCol"></div>
+    </div>
+    <div class="summary-section">
+      <div class="sec-label">住院日額總覽</div>
+      <div class="summary-grid" id="summaryGrid"></div>
+      <div class="action-row">
+        <button class="btn-sec" onclick="switchTab('form')"><i class="ti ti-edit"></i> 修改資料</button>
+        <button class="btn-pri" onclick="exportPDF()"><i class="ti ti-file-type-pdf"></i> 匯出 PDF</button>
+        <!-- ===== 新增 Google Sheets 整合開始 ===== -->
+        <button class="btn-sec" id="syncSheetsBtn" onclick="sendToGoogleSheets()"><i class="ti ti-cloud-upload"></i> 同步至 Google Sheet</button>
+        <!-- ===== 新增 Google Sheets 整合結束 ===== -->
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ── tab / toggle ── */
+function switchTab(t) {
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',(i===0)===(t==='form')));
+  document.getElementById('formView').classList.toggle('active',t==='form');
+  document.getElementById('resultView').classList.toggle('active',t==='result');
+}
+function toggleSection(id) {
+  document.getElementById('body-'+id).classList.toggle('disabled',!document.getElementById('tog-'+id).checked);
+}
+
+/* ── helpers ── */
+// 百元單位：輸入數字 × 100，輸出帶逗號格式
+function h(id){ const n=parseFloat(document.getElementById(id)?.value)||0; return n*100; }
+function hFmt(id){ const v=h(id); return v>0?(v).toLocaleString():null; }
+// 萬元單位：輸入數字，輸出「XX萬」
+function w(id){ return (document.getElementById(id)?.value||'').trim(); }
+function wFmt(id){ const v=w(id); return v?v+'萬':null; }
+// 萬元×10000，用於計算加總時
+function wNum(id){ return (parseFloat(document.getElementById(id)?.value)||0)*10000; }
+
+function val(id){ return (document.getElementById(id)?.value||'').trim(); }
+function num(id){ return parseFloat(document.getElementById(id)?.value)||0; }
+function isOn(id){ return document.getElementById('tog-'+id)?.checked||false; }
+
+function toggleLifetime(prefix) {
+  const cb=document.getElementById(prefix+'-lifetime');
+  const inp=document.getElementById(prefix+'-age');
+  if(!inp) return;
+  if(cb.checked){ inp.value=''; inp.disabled=true; inp.placeholder='終身'; }
+  else { inp.disabled=false; inp.placeholder=''; }
+}
+function getPeriod(prefix) {
+  const cb=document.getElementById(prefix+'-lifetime');
+  if(cb?.checked) return '終身';
+  const a=val(prefix+'-age');
+  return a?'至'+a+'歲':'—';
+}
+window.addEventListener('DOMContentLoaded',()=>toggleLifetime('life'));
+
+function updateDailySum(){
+  const s=h('daily-hosp')+h('daily-nurse')+h('daily-post');
+  document.getElementById('daily-sum-preview').textContent='住院日額合計：'+s.toLocaleString()+' /日';
+}
+function updateCancerSum(){
+  const s=h('cancer-hosp')+h('cancer-post');
+  document.getElementById('cancer-sum-preview').textContent='癌症住院日額合計：'+s.toLocaleString()+' /日';
+}
+
+/* ── pie config — colours from reference image ── */
+const SEGS=[
+  { id:'critical', label:'重大傷病', emoji:'🏥', hex:'#b8cfe0' },
+  { id:'medical',  label:'醫療',     emoji:'💊', hex:'#c0dac4' },
+  { id:'longcare', label:'長照',     emoji:'🤲', hex:'#f5d0b0' },
+  { id:'life',     label:'壽險',     emoji:'❤️', hex:'#f0c4cc' },
+  { id:'finance',  label:'理財',     emoji:'💰', hex:'#d4c8e8' },
+  { id:'retire',   label:'退休',     emoji:'🌅', hex:'#ede8c0' },
+];
+const INACTIVE='#e4e3de';
+const ALPHA=0.83;
+
+/* ── card config ── */
+const CARD_CFG={
+  critical:{ tc:'tc-critical', bc:'bc-critical', emoji:'🏥', title:'重大傷病 / 疾病' },
+  daily:   { tc:'tc-medical',  bc:'bc-medical',  emoji:'💊', title:'日額 / 手術' },
+  reimb:   { tc:'tc-medical',  bc:'bc-medical',  emoji:'🧾', title:'實支實付' },
+  accident:{ tc:'tc-medical',  bc:'bc-medical',  emoji:'🚑', title:'意外險' },
+  cancer:  { tc:'tc-medical',  bc:'bc-medical',  emoji:'🎗️', title:'癌症險' },
+  longcare:{ tc:'tc-longcare', bc:'bc-longcare', emoji:'🤲', title:'長照' },
+  life:    { tc:'tc-life',     bc:'bc-life',     emoji:'❤️', title:'壽險' },
+  finance: { tc:'tc-finance',  bc:'bc-finance',  emoji:'💰', title:'理財' },
+  retire:  { tc:'tc-retire',   bc:'bc-retire',   emoji:'🌅', title:'退休' },
+};
+
+/* ── generate ── */
+function generate(){
+  const cards=[], active=new Set();
+
+  if(isOn('critical')){
+    const rows=[];
+    const cf=wFmt('critical-amount'), df=wFmt('disease-amount');
+    if(cf) rows.push({label:'重大傷病',value:cf});
+    if(df) rows.push({label:'重大疾病',value:df});
+    if(rows.length){
+      const cp=getPeriod('critical'), dp=val('disease-amount')?getPeriod('disease'):'';
+      const badge=(dp&&dp!==cp)?cp+' / '+dp:cp;
+      cards.push({type:'critical',badge,rows}); active.add('critical');
+    }
+  }
+  if(isOn('daily')){
+    const s=h('daily-hosp')+h('daily-nurse')+h('daily-post');
+    const rows=[];
+    if(s>0) rows.push({label:'住院日額',value:s.toLocaleString()+'/日'});
+    const mn=val('daily-op-min'),mx=val('daily-op-max');
+    if(mn||mx) rows.push({label:'定額手術',value:(mn&&mx?mn+'～'+mx:mn||mx)+'/次'});
+    if(rows.length){cards.push({type:'daily',badge:getPeriod('daily'),rows});active.add('medical');}
+  }
+  if(isOn('reimbursement')){
+    const rows=[];
+    if(val('reimb-room')) rows.push({label:'病房費',value:val('reimb-room')+'/日'});
+    const mn=val('reimb-op-min'),mx=val('reimb-op-max');
+    if(mn||mx) rows.push({label:'手術',value:(mn&&mx?mn+'～'+mx:mn||mx)+'/次'});
+    if(val('reimb-misc')) rows.push({label:'雜費',value:val('reimb-misc')});
+    if(rows.length){cards.push({type:'reimb',badge:getPeriod('reimb'),rows});active.add('medical');}
+  }
+  if(isOn('accident')){
+    const rows=[];
+    const adFmt=wFmt('acc-death'), arFmt=wFmt('acc-reimb'), adDaily=h('acc-daily');
+    if(adFmt)      rows.push({label:'身故／失能',value:adFmt});
+    if(arFmt)      rows.push({label:'實支實付',value:arFmt+'/次'});
+    if(adDaily>0)  rows.push({label:'住院日額',value:adDaily.toLocaleString()+'/日'});
+    if(val('acc-fracture')) rows.push({label:'骨折',value:val('acc-fracture')});
+    if(rows.length){cards.push({type:'accident',badge:getPeriod('acc'),rows});active.add('medical');}
+  }
+  if(isOn('cancer')){
+    const cs=h('cancer-hosp')+h('cancer-post');
+    const rows=[];
+    if(cs>0) rows.push({label:'住院日額',value:cs.toLocaleString()+'/日'});
+    const chemo=val('cancer-chemo');
+    if(chemo) rows.push({label:'放射／化療',value:(parseFloat(chemo)*100).toLocaleString()+'/次'});
+    const copFmt=wFmt('cancer-op');
+    if(copFmt) rows.push({label:'手術（重度）',value:copFmt+'/次'});
+    const caFmt=wFmt('cancer-care-amt'), cy=val('cancer-care-yrs');
+    if(caFmt) rows.push({label:'生存照顧金',value:caFmt+'/年'+(cy?'×'+cy:'')});
+    if(rows.length){cards.push({type:'cancer',badge:getPeriod('cancer'),rows});active.add('medical');}
+  }
+  if(isOn('longcare')){
+    const rows=[];
+    const lfmt=wFmt('longcare-lump'), mfmt=wFmt('longcare-monthly');
+    if(lfmt) rows.push({label:'一次金',value:lfmt});
+    if(mfmt) rows.push({label:'每月照顧金',value:mfmt+'/月'});
+    if(rows.length){cards.push({type:'longcare',badge:getPeriod('longcare'),rows});active.add('longcare');}
+  }
+  if(isOn('life')&&val('life-amount')){
+    const lf=wFmt('life-amount');
+    if(lf){cards.push({type:'life',badge:getPeriod('life'),rows:[{label:'保額',value:lf}]});active.add('life');}
+  }
+  if(isOn('finance')&&val('finance-note')){
+    cards.push({type:'finance',badge:'—',freetext:val('finance-note'),rows:[]});
+    active.add('finance');
+  }
+  if(isOn('retire')&&val('retire-note')){
+    cards.push({type:'retire',badge:'—',freetext:val('retire-note'),rows:[]});
+    active.add('retire');
+  }
+
+  /* ── summary: 更新規則 ── */
+  const dailyBase   = isOn('daily') ? h('daily-hosp')+h('daily-nurse')+h('daily-post') : 0;
+  const accExtra    = isOn('accident') ? h('acc-daily') : 0;
+  const cancerExtra = isOn('cancer')   ? h('cancer-hosp')+h('cancer-post') : 0;
+
+  const generalTotal = dailyBase;
+  const accTotal     = dailyBase + accExtra;      // 意外住院 = 一般 + 意外日額
+  const cancerTotal  = dailyBase + cancerExtra;   // 癌症住院 = 一般 + 癌症日額
+
+  renderResult(cards, active, {
+    general:  generalTotal>0 ? generalTotal.toLocaleString() : '—',
+    accident: accTotal>0     ? accTotal.toLocaleString()     : '—',
+    cancer:   cancerTotal>0  ? cancerTotal.toLocaleString()  : '—',
+  });
+  switchTab('result');
+}
+
+/* ── render ── */
+function renderResult(cards, active, summary){
+  document.getElementById('pieClientName').textContent=val('clientName')||'';
+  document.getElementById('piePlanDate').textContent=val('planDate')?'建議書日期 '+val('planDate'):'';
+
+  /* cards */
+  const col=document.getElementById('cardsCol');
+  col.innerHTML='';
+  cards.forEach(card=>{
+    const cfg=CARD_CFG[card.type];
+    const rowsHtml=(card.rows||[]).map(r=>`<div class="card-row"><span class="card-row-label">${r.label}</span><span class="card-row-value">${r.value}</span></div>`).join('');
+    const ftHtml=card.freetext?`<div class="card-freetext">${card.freetext}</div>`:'';
+    col.innerHTML+=`
+      <div class="ins-card ${cfg.tc}">
+        <div class="card-header">
+          <div class="card-title"><span class="emoji">${cfg.emoji}</span>${cfg.title}</div>
+          <span class="card-badge ${cfg.bc}">${card.badge}</span>
+        </div>
+        <div class="card-rows">${rowsHtml}${ftHtml}</div>
+      </div>`;
+  });
+
+  /* summary */
+  document.getElementById('summaryGrid').innerHTML=`
+    <div class="sum-card"><div class="sum-lbl">一般住院／日</div><div class="sum-val sc-dark">${summary.general}</div></div>
+    <div class="sum-card"><div class="sum-lbl">意外住院／日</div><div class="sum-val sc-blue">${summary.accident}</div></div>
+    <div class="sum-card"><div class="sum-lbl">癌症住院／日</div><div class="sum-val sc-pink">${summary.cancer}</div></div>`;
+
+  drawPie(active);
+}
+
+/* ── pie ── */
+function drawPie(active){
+  const canvas=document.getElementById('pieChart');
+  const dpr=window.devicePixelRatio||2;
+  const SIZE=260;
+  canvas.width=SIZE*dpr; canvas.height=SIZE*dpr;
+  canvas.style.width=SIZE+'px'; canvas.style.height=SIZE+'px';
+
+  const ctx=canvas.getContext('2d');
+  ctx.scale(dpr,dpr);
+
+  const cx=SIZE/2, cy=SIZE/2;
+  const R=SIZE/2-4, holeR=R*0.62;
+  const n=SEGS.length, slice=(Math.PI*2)/n, GAP=0.034;
+
+  SEGS.forEach((seg,i)=>{
+    const s=-Math.PI/2+slice*i, e=s+slice;
+    const isActive=active.has(seg.id);
+
+    /* slice fill */
+    ctx.save();
+    ctx.globalAlpha=isActive?ALPHA:0.38;
+    ctx.beginPath();
+    ctx.arc(cx,cy,R,s+GAP,e-GAP);
+    ctx.arc(cx,cy,holeR,e-GAP,s+GAP,true);
+    ctx.closePath();
+    ctx.fillStyle=isActive?seg.hex:INACTIVE;
+    ctx.fill();
+    ctx.restore();
+
+    /* emoji + label — always full opacity */
+    const mid=(s+e)/2, lr=(R+holeR)/2;
+    const lx=cx+Math.cos(mid)*lr, ly=cy+Math.sin(mid)*lr;
+    ctx.save();
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+
+    ctx.globalAlpha=isActive?1:0.35;
+    ctx.font=`${SIZE*0.068}px serif`;
+    ctx.fillText(seg.emoji,lx,ly-SIZE*0.044);
+
+    ctx.globalAlpha=1;
+    ctx.font=`600 ${SIZE*0.047}px -apple-system,sans-serif`;
+    ctx.fillStyle=isActive?'#2e2e2a':'#b8b7b2';
+    const lbl=seg.label;
+    if(lbl.length>2){
+      ctx.fillText(lbl.slice(0,2),lx,ly+SIZE*0.022);
+      ctx.fillText(lbl.slice(2),  lx,ly+SIZE*0.07);
+    } else {
+      ctx.fillText(lbl,lx,ly+SIZE*0.035);
+    }
+    ctx.restore();
+  });
+
+  /* white hole */
+  ctx.beginPath(); ctx.arc(cx,cy,holeR-0.5,0,Math.PI*2);
+  ctx.fillStyle='#ffffff'; ctx.fill();
+
+  /* center text */
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  const name=val('clientName');
+  if(name){
+    ctx.font=`700 ${SIZE*0.062}px -apple-system,sans-serif`;
+    ctx.fillStyle='#2a2a27';
+    ctx.fillText(name,cx,cy-SIZE*0.035);
+    ctx.font=`400 ${SIZE*0.048}px -apple-system,sans-serif`;
+    ctx.fillStyle='#a8a79f';
+    ctx.fillText('保障視圖',cx,cy+SIZE*0.048);
+  } else {
+    ctx.font=`600 ${SIZE*0.057}px -apple-system,sans-serif`;
+    ctx.fillStyle='#2a2a27';
+    ctx.fillText('保障視圖',cx,cy);
+  }
+
+  /* legend */
+  function getLegBadge(seg){
+    if(!active.has(seg.id)) return {text:'尚未規劃',cls:'leg-off'};
+    let p='—';
+    if(seg.id==='critical') p=getPeriod('critical');
+    else if(seg.id==='medical'){
+      const ps=[];
+      if(isOn('daily')) ps.push(getPeriod('daily'));
+      if(isOn('reimbursement')) ps.push(getPeriod('reimb'));
+      if(isOn('accident')) ps.push(getPeriod('acc'));
+      if(isOn('cancer')) ps.push(getPeriod('cancer'));
+      const u=[...new Set(ps)].filter(x=>x!=='—');
+      p=u.length?u.join(' / '):'—';
+    }
+    else if(seg.id==='longcare') p=getPeriod('longcare');
+    else if(seg.id==='life')     p=getPeriod('life');
+    return {text:p,cls:'leg-on'};
+  }
+
+  document.getElementById('pieLegend').innerHTML=SEGS.map(seg=>{
+    const b=getLegBadge(seg);
+    const isActive=active.has(seg.id);
+    return `<div class="leg-row">
+      <span class="leg-dot" style="background:${isActive?seg.hex:INACTIVE};opacity:${isActive?ALPHA+0.1:0.5}"></span>
+      <span class="leg-name" style="color:${isActive?'#2a2a27':'#b0afa8'}">${seg.label}</span>
+      <span class="leg-pill ${b.cls}">${b.text}</span>
+    </div>`;
+  }).join('');
+}
+
+async function exportPDF(){
+  const { jsPDF } = window.jspdf;
+  const clientName = val('clientName') || '客戶';
+  const planDate   = val('planDate') || '';
+
+  const resultView = document.getElementById('resultView');
+  const actionRow  = resultView.querySelector('.action-row');
+  actionRow.style.display = 'none';
+
+  // ── wrapper：白底＋留邊，模擬 A 版設計 ──
+  const W = resultView.offsetWidth;
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = `
+    position:fixed; left:-9999px; top:0;
+    width:${W}px;
+    background:#ffffff;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    padding: 28px 32px 32px;
+  `;
+
+  // ── 彩色頂條 ──
+  const bar = document.createElement('div');
+  bar.style.cssText = `
+    height: 5px;
+    border-radius: 3px;
+    background: linear-gradient(90deg,#a8c4de,#c0dac4,#f0c4cc,#d4c8e8,#ede8c0,#f5ceaf);
+    margin-bottom: 16px;
+  `;
+
+  // ── 標題（居中） ──
+  const titleDiv = document.createElement('div');
+  titleDiv.style.cssText = `
+    text-align: center;
+    margin-bottom: 20px;
+  `;
+  const titleName = document.createElement('div');
+  titleName.style.cssText = `font-size:17px;font-weight:700;color:#2a2a27;`;
+  titleName.textContent = clientName + ' 的保單匯總報告';
+  const titleSub = document.createElement('div');
+  titleSub.style.cssText = `font-size:11px;color:#a8a79f;margin-top:3px;`;
+  titleSub.textContent = planDate ? '建議書日期 ' + planDate : '';
+  titleDiv.appendChild(titleName);
+  if (planDate) titleDiv.appendChild(titleSub);
+
+  // ── 細分隔線 ──
+  const hr = document.createElement('div');
+  hr.style.cssText = `height:0.5px;background:#e0dfda;margin-bottom:20px;`;
+
+  // ── clone 內容 ──
+  const clone = resultView.cloneNode(true);
+  clone.style.cssText = 'padding:0;background:transparent;';
+  const cloneAction = clone.querySelector('.action-row');
+  if (cloneAction) cloneAction.style.display = 'none';
+
+  // 把 pie canvas 畫到 clone
+  const origCanvas = document.getElementById('pieChart');
+  const cloneCanvas = clone.querySelector('#pieChart');
+  if (origCanvas && cloneCanvas) {
+    cloneCanvas.width  = origCanvas.width;
+    cloneCanvas.height = origCanvas.height;
+    cloneCanvas.style.width  = origCanvas.style.width;
+    cloneCanvas.style.height = origCanvas.style.height;
+    cloneCanvas.getContext('2d').drawImage(origCanvas, 0, 0);
+  }
+
+  wrapper.appendChild(bar);
+  wrapper.appendChild(titleDiv);
+  wrapper.appendChild(hr);
+  wrapper.appendChild(clone);
+  document.body.appendChild(wrapper);
+
+  const canvas = await html2canvas(wrapper, {
+    scale: 2,
+    useCORS: true,
+    backgroundColor: '#ffffff',
+    logging: false,
+  });
+
+  document.body.removeChild(wrapper);
+  actionRow.style.display = '';
+
+  // ── 放入 A4，四邊留白 ──
+  const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+  const pageW = 210, pageH = 297;
+  const margin = 12;
+  const availW = pageW - margin * 2;
+  const availH = pageH - margin * 2;
+  const imgRatio = canvas.height / canvas.width;
+  const imgH = imgRatio * availW;
+  const finalH = Math.min(imgH, availH);
+  const finalW = (finalH / imgH) * availW;
+  const xOff = margin + (availW - finalW) / 2;
+  const yOff = 18; // 頂部固定 18mm，靠上對齊
+
+  pdf.addImage(canvas.toDataURL('image/png'), 'PNG', xOff, yOff, finalW, finalH);
+  pdf.save(clientName + '的保單匯總報告.pdf');
+}
+</script>
+
+<!-- ===== 新增功能開始：外部模組化 JS（OCR 匯入 + Google Sheets 同步） ===== -->
+<script src="mapping.js"></script>
+<script src="ocr.js"></script>
+<script src="sheets.js"></script>
+<!-- ===== 新增功能結束 ===== -->
+</body>
+</html>
