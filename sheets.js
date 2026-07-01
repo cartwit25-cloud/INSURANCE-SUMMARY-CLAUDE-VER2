@@ -4,7 +4,7 @@
 //   2. 貼到下面 GOOGLE_SHEETS_WEBAPP_URL
 //   3. 保障卡片頁下方會多一顆「同步至 Google Sheet」按鈕，點擊後把目前表單所有欄位送出一筆紀錄
 
-const GOOGLE_SHEETS_WEBAPP_URL = '請貼上你的 Apps Script Web App URL（例如 https://script.google.com/macros/s/xxxx/exec）';
+const GOOGLE_SHEETS_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbzQVVRbsLrwE1LaMi4ID3U29FJ48Y8dEGlK9N_34JPrj-M2-Vk-QVd6Zxbib1ITKQhFag/exec';
 
 // 會被送出的欄位清單（順序需與 Google Apps Script 裡的 headers 一致）
 const SHEETS_FIELD_IDS = [
